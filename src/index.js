@@ -12,8 +12,11 @@ import { Store } from './store.js';
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 const store = new Store(config.dataFile);
 let reconnectTimer;
+let stopping = false;
+let activeSocket;
 
 async function startBot() {
+  if (stopping) return;
   await store.init();
   const { state, saveCreds } = await useMultiFileAuthState('./.baileys_auth');
   const { version } = await fetchLatestBaileysVersion();
@@ -25,7 +28,11 @@ async function startBot() {
     browser: ['ReportBot', 'Chrome', '1.0.0'],
     markOnlineOnConnect: false,
     generateHighQualityLinkPreview: false,
+    connectTimeoutMs: 60_000,
+    defaultQueryTimeoutMs: 60_000,
+    retryRequestDelayMs: 5_000,
   });
+  activeSocket = sock;
 
   sock.ev.on('creds.update', saveCreds);
   sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
@@ -33,7 +40,7 @@ async function startBot() {
     if (connection === 'open') logger.info('Bot conectado a WhatsApp');
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode;
-      const shouldReconnect = code !== DisconnectReason.loggedOut;
+      const shouldReconnect = !stopping && code !== DisconnectReason.loggedOut;
       logger.warn({ code, shouldReconnect }, 'Conexión cerrada');
       if (shouldReconnect && !reconnectTimer) {
         reconnectTimer = setTimeout(() => {
@@ -51,7 +58,7 @@ async function startBot() {
       try {
         if (!message.message || message.key.fromMe) continue;
         const sourceJid = message.key.remoteJid;
-        if (!sourceJid || sourceJid === 'status@broadcast') continue;
+        if (!sourceJid || sourceJid === 'status@broadcast' || sourceJid.endsWith('@broadcast')) continue;
         const senderJid = message.key.participant || sourceJid;
         const text = message.message.conversation
           || message.message.extendedTextMessage?.text
@@ -70,6 +77,17 @@ async function startBot() {
     }
   });
 }
+
+async function shutdown(signal) {
+  if (stopping) return;
+  stopping = true;
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  logger.info({ signal }, 'Apagando bot');
+  activeSocket?.end?.(new Error(`Shutdown: ${signal}`));
+}
+
+process.once('SIGINT', () => shutdown('SIGINT'));
+process.once('SIGTERM', () => shutdown('SIGTERM'));
 
 startBot().catch((error) => {
   logger.fatal({ err: error }, 'No fue posible iniciar el bot');

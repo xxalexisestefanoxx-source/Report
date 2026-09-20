@@ -18,12 +18,17 @@ function isAdmin(jid) {
 
 export function createCommandHandler({ store, sock, logger }) {
   return async function handleCommand({ message, text, senderJid, pushName, sourceJid }) {
-    const [rawCommand, ...args] = text.trim().split(/\s+/);
+    const normalizedText = String(text || '').trim();
+    if (!normalizedText || !sourceJid || !senderJid) return;
+    const [rawCommand, ...args] = normalizedText.split(/\s+/);
     const command = rawCommand.toLowerCase();
     const reply = (content) => sock.sendMessage(sourceJid, { text: content }, { quoted: message });
+    const reporterNumber = jidToNumber(senderJid);
+
+    if (!reporterNumber) return reply('No fue posible identificar al remitente de este mensaje.');
 
     if (command === 'start') {
-      await store.registerUser({ number: jidToNumber(senderJid), name: pushName || '', sourceJid });
+      await store.registerUser({ number: reporterNumber, name: pushName || '', sourceJid });
       return reply(welcome(pushName, config.botName));
     }
 
@@ -33,7 +38,8 @@ export function createCommandHandler({ store, sock, logger }) {
     if (command === 'reportar') {
       const targetNumber = validTarget(args[0]);
       if (!targetNumber) return reply(reportUsage(config.prefix));
-      const rateKey = `report:${jidToNumber(senderJid)}`;
+      if (targetNumber === reporterNumber) return reply('No puedes reportar tu propio número.');
+      const rateKey = `report:${reporterNumber}`;
       if (!store.canRun(rateKey, config.reportCooldownMs)) {
         return reply('Ya registraste un reporte recientemente. Espera el cooldown antes de enviar otro.');
       }
@@ -44,25 +50,33 @@ export function createCommandHandler({ store, sock, logger }) {
       const report = {
         id: crypto.randomUUID(),
         targetNumber,
-        reporterNumber: jidToNumber(senderJid),
+        reporterNumber,
         reporterName: pushName || '',
         sourceJid,
         createdAt: new Date().toISOString(),
+        status: 'pending',
       };
       await store.addReport(report);
-      await store.markRun(rateKey);
-      await sock.sendMessage(config.moderationJid, { text: moderationAlert(report) });
+      try {
+        await sock.sendMessage(config.moderationJid, { text: moderationAlert(report) });
+        await store.updateReport(report.id, { status: 'sent', sentAt: new Date().toISOString() });
+        await store.markRun(rateKey);
+      } catch (error) {
+        await store.updateReport(report.id, { status: 'delivery_failed', error: 'moderation_send_failed' });
+        logger.error({ err: error, reportId: report.id }, 'No se pudo enviar el reporte a moderación');
+        return reply(`El reporte fue guardado, pero no pudo enviarse a moderación. Folio: ${report.id.slice(0, 8)}.`);
+      }
       return reply(`Reporte registrado con folio ${report.id.slice(0, 8)}. Será revisado por moderación.`);
     }
 
     if (command === 'bucle') {
       if (!isAdmin(senderJid)) return reply('Este comando está restringido a administradores.');
       const targetNumber = validTarget(args[0]);
-      const iterations = Number.parseInt(args[1], 10);
-      if (!targetNumber || !Number.isInteger(iterations) || iterations < 1 || iterations > config.maxLoopIterations) {
+      const iterations = /^\d+$/.test(args[1] || '') ? Number(args[1]) : NaN;
+      if (!targetNumber || !Number.isSafeInteger(iterations) || iterations < 1 || iterations > config.maxLoopIterations) {
         return reply(loopUsage(config.prefix));
       }
-      const rateKey = `loop:${jidToNumber(senderJid)}`;
+      const rateKey = `loop:${reporterNumber}`;
       if (!store.canRun(rateKey, config.loopCooldownMs)) return reply('La simulación tiene cooldown activo. Intenta más tarde.');
       await store.markRun(rateKey);
       for (let index = 1; index <= iterations; index += 1) {

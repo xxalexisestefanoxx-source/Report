@@ -20,6 +20,7 @@ Bot modular para WhatsApp basado en **Node.js 20+** y **Baileys**. Su objetivo e
 - `src/store.js`: persistencia JSON atómica y cooldowns.
 - `src/config.js`: configuración y normalización de números.
 - `data/bot-data.json`: generado en ejecución y excluido de Git.
+- `test/core.test.js`: pruebas de persistencia concurrente y cooldowns.
 
 ## Instalación en Termux
 
@@ -30,6 +31,8 @@ pkg update -y && pkg upgrade -y && pkg install -y git nodejs-lts ffmpeg libwebp 
 ```
 
 Antes de iniciar en producción, edita `.env` y define `MODERATION_JID`, `ADMIN_NUMBERS`, `SUPPORT_URL` y `SUPPORT_EMAIL`. El primer arranque mostrará un QR; vincula el dispositivo desde WhatsApp > Dispositivos vinculados.
+
+Para validar el proyecto sin iniciar WhatsApp, ejecuta `npm run check && npm test`. Los mensajes `got history notification`, `no name present, ignoring presence update request` y algunos `Timed Out` durante la sincronización inicial son eventos o advertencias de Baileys; si después aparece `Bot conectado a WhatsApp`, la conexión se estableció. El programa usa timeouts ampliados, reconexión controlada y apagado limpio con `SIGINT`/`SIGTERM`.
 
 ## Configuración de seguridad
 
