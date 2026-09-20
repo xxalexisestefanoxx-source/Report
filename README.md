@@ -20,7 +20,7 @@ Bot modular para WhatsApp basado en **Node.js 20+** y **Baileys**. Su objetivo e
 - `src/store.js`: persistencia JSON atómica y cooldowns.
 - `src/config.js`: configuración y normalización de números.
 - `data/bot-data.json`: generado en ejecución y excluido de Git.
-- `test/core.test.js`: pruebas de persistencia concurrente y cooldowns.
+- `test/core.test.js` y `test/baileys-exports.mjs`: pruebas de persistencia, cooldowns y compatibilidad de exportaciones.
 
 ## Instalación en Termux
 
@@ -34,8 +34,18 @@ Antes de iniciar en producción, edita `.env` y define `MODERATION_JID`, `ADMIN_
 
 Para validar el proyecto sin iniciar WhatsApp, ejecuta `npm run check && npm test`. Los mensajes `got history notification`, `no name present, ignoring presence update request` y algunos `Timed Out` durante la sincronización inicial son eventos o advertencias de Baileys; si después aparece `Bot conectado a WhatsApp`, la conexión se estableció. El programa usa timeouts ampliados, reconexión controlada y apagado limpio con `SIGINT`/`SIGTERM`.
 
+### Inicio limpio en Termux
+
+Si la sesión local quedó desincronizada, no es necesario borrar todo el proyecto. Detén las instancias, respalda `.baileys_auth`, actualiza el código y vuelve a vincular un único dispositivo con el QR:
+
+```bash
+cd ~/nuevo-bot/Report/Report && pkill -TERM -f 'node src/index.js' 2>/dev/null || true && sleep 4 && termux-wake-lock 2>/dev/null || true && if [ -d .baileys_auth ]; then mv .baileys_auth ".baileys_auth.backup.$(date +%Y%m%d-%H%M%S)"; fi && git pull --ff-only origin main && npm install --no-audit --no-fund && npm run check && npm test && npm start
+```
+
+El QR se genera escuchando `connection.update`; no se usa `printQRInTerminal`, que está obsoleto en versiones recientes. Si el inicio limpio vuelve a fallar con `515` y `408`, prueba otra red y verifica que `curl -4 -I --max-time 20 https://web.whatsapp.com` funcione. No ejecutes dos instancias del proceso.
+
 ## Configuración de seguridad
 
 El bot aplica validación internacional de números, cooldown por emisor, almacenamiento de folios, límite de cinco iteraciones para la simulación administrativa y separación del canal de moderación. No debe utilizarse para enviar spam, acosar, coordinar reportes falsos ni contactar repetidamente a terceros. Las decisiones sobre un reporte pertenecen al equipo de moderación y deben basarse en evidencia y políticas aplicables.
 
-Para un despliegue 24/7, usa un proceso supervisado en un servidor administrado o un servicio Node.js con reinicio automático. No compartas `.env`, la carpeta `.baileys_auth` ni `data/bot-data.json`.
+Para un despliegue 24/7, usa un proceso supervisado en un servidor administrado o un servicio Node.js con reinicio automático. No compartas `.env`, la carpeta `.baileys_auth` ni `data/bot-data.json`. El socket incorpora cachés de reintento, claves Signal y metadatos de grupos, además de un almacén limitado de mensajes para que WhatsApp pueda repetir entregas fallidas.
