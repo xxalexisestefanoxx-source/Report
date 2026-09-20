@@ -34,6 +34,23 @@ function rememberMessage(message) {
   }
 }
 
+function unwrapMessageContent(content) {
+  return content?.ephemeralMessage?.message
+    || content?.viewOnceMessage?.message
+    || content?.viewOnceMessageV2?.message
+    || content?.documentWithCaptionMessage?.message
+    || content;
+}
+
+function extractText(message) {
+  const content = unwrapMessageContent(message?.message);
+  return content?.conversation
+    || content?.extendedTextMessage?.text
+    || content?.imageMessage?.caption
+    || content?.videoMessage?.caption
+    || '';
+}
+
 function scheduleReconnect(reason) {
   if (stopping || reconnectTimer) return;
   logger.warn({ reason }, 'Programando reconexión');
@@ -113,17 +130,20 @@ async function startBot() {
     if (type !== 'notify') return;
     for (const message of messages) {
       try {
-        if (!message.message || message.key.fromMe) continue;
+        if (!message.message) continue;
+        if (message.key.fromMe) {
+          logger.debug({ messageId: message.key.id }, 'Mensaje propio ignorado');
+          continue;
+        }
         const sourceJid = message.key.remoteJid;
         if (!sourceJid || sourceJid === 'status@broadcast' || sourceJid.endsWith('@broadcast')) continue;
         const senderJid = message.key.participantAlt
           || message.key.participant
           || message.key.remoteJidAlt
           || sourceJid;
-        const text = message.message.conversation
-          || message.message.extendedTextMessage?.text
-          || '';
+        const text = extractText(message);
         if (!text.startsWith(config.prefix)) continue;
+        logger.info({ command: text.split(/\s+/)[0], sourceJid }, 'Comando recibido');
         await handleCommand({
           message,
           text: text.slice(config.prefix.length),
