@@ -116,7 +116,10 @@ async function startBot() {
         if (!message.message || message.key.fromMe) continue;
         const sourceJid = message.key.remoteJid;
         if (!sourceJid || sourceJid === 'status@broadcast' || sourceJid.endsWith('@broadcast')) continue;
-        const senderJid = message.key.participant || sourceJid;
+        const senderJid = message.key.participantAlt
+          || message.key.participant
+          || message.key.remoteJidAlt
+          || sourceJid;
         const text = message.message.conversation
           || message.message.extendedTextMessage?.text
           || '';

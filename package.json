@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@cacheable/node-cache": "^1.7.5",
-    "@whiskeysockets/baileys": "^6.7.18",
+    "@whiskeysockets/baileys": "7.0.0-rc14",
     "dotenv": "^16.4.7",
     "libphonenumber-js": "^1.11.20",
     "pino": "^9.6.0",

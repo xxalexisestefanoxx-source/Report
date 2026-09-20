@@ -1,6 +1,6 @@
 # Bot de Reportes de WhatsApp
 
-Bot modular para WhatsApp basado en **Node.js 20+** y **Baileys**. Su objetivo es registrar reportes individuales, preservar trazabilidad y reenviar cada caso a un canal de moderación para revisión humana.
+Bot modular para WhatsApp basado en **Node.js 20+** y **Baileys 7**. Su objetivo es registrar reportes individuales, preservar trazabilidad y reenviar cada caso a un canal de moderación para revisión humana.
 
 ## Funcionalidades
 
@@ -42,7 +42,7 @@ Si la sesión local quedó desincronizada, no es necesario borrar todo el proyec
 cd ~/nuevo-bot/Report/Report && pkill -TERM -f 'node src/index.js' 2>/dev/null || true && sleep 4 && termux-wake-lock 2>/dev/null || true && if [ -d .baileys_auth ]; then mv .baileys_auth ".baileys_auth.backup.$(date +%Y%m%d-%H%M%S)"; fi && git pull --ff-only origin main && npm install --no-audit --no-fund && npm run check && npm test && npm start
 ```
 
-El QR se genera escuchando `connection.update`; no se usa `printQRInTerminal`, que está obsoleto en versiones recientes. Si el inicio limpio vuelve a fallar con `515` y `408`, prueba otra red y verifica que `curl -4 -I --max-time 20 https://web.whatsapp.com` funcione. No ejecutes dos instancias del proceso.
+El QR se genera escuchando `connection.update`; no se usa `printQRInTerminal`, que está obsoleto en versiones recientes. El proyecto fija `@whiskeysockets/baileys` en `7.0.0-rc14`, actualmente publicado como la etiqueta `latest`; la rama `6.7.24` aparece como `legacy`. El código acepta `participantAlt` y `remoteJidAlt` para que grupos y chats con LID no pierdan la identificación del remitente. Si el inicio limpio vuelve a fallar con `515` y `408`, prueba otra red y verifica que `curl -4 -I --max-time 20 https://web.whatsapp.com` funcione. No ejecutes dos instancias del proceso.
 
 ## Configuración de seguridad
 
