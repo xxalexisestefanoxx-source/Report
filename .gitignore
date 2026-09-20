@@ -1,7 +1,6 @@
 node_modules/
 .env
-.env.*
-!.env.example
-data/*.json
+data/
+logs/
 *.log
 .baileys_auth/
